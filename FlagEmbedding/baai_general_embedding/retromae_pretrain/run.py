@@ -4,15 +4,15 @@ import sys
 
 import transformers
 from transformers import (
+    AutoConfig,
     AutoTokenizer,
     BertForMaskedLM,
-    AutoConfig,
-    HfArgumentParser, set_seed, )
-from transformers import (
+    HfArgumentParser,
     TrainerCallback,
-    TrainingArguments,
+    TrainerControl,
     TrainerState,
-    TrainerControl
+    TrainingArguments,
+    set_seed,
 )
 from transformers.trainer_utils import is_main_process
 
@@ -25,7 +25,13 @@ logger = logging.getLogger(__name__)
 
 
 class TrainerCallbackForSaving(TrainerCallback):
-    def on_epoch_end(self, args: TrainingArguments, state: TrainerState, control: TrainerControl, **kwargs):
+    def on_epoch_end(
+        self,
+        args: TrainingArguments,
+        state: TrainerState,
+        control: TrainerControl,
+        **kwargs,
+    ):
         """
         Event called at the end of an epoch.
         """
@@ -37,19 +43,23 @@ def main():
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    parser = HfArgumentParser(
+        (ModelArguments, DataTrainingArguments, TrainingArguments)
+    )
     if len(sys.argv) == 2 and sys.argv[1].endswith(".json"):
         # If we pass only one argument to the script and it's the path to a json file,
         # let's parse it to get our arguments.
-        model_args, data_args, training_args = parser.parse_json_file(json_file=os.path.abspath(sys.argv[1]))
+        model_args, data_args, training_args = parser.parse_json_file(
+            json_file=os.path.abspath(sys.argv[1])
+        )
     else:
         model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if (
-            os.path.exists(training_args.output_dir)
-            and os.listdir(training_args.output_dir)
-            and training_args.do_train
-            and not training_args.overwrite_output_dir
+        os.path.exists(training_args.output_dir)
+        and os.listdir(training_args.output_dir)
+        and training_args.do_train
+        and not training_args.overwrite_output_dir
     ):
         raise ValueError(
             f"Output directory ({training_args.output_dir}) already exists and is not empty."
@@ -66,7 +76,9 @@ def main():
     logging.basicConfig(
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO if is_main_process(training_args.local_rank) else logging.WARN,
+        level=(
+            logging.INFO if is_main_process(training_args.local_rank) else logging.WARN
+        ),
     )
 
     # Log on each process the small summary:
@@ -102,12 +114,16 @@ def main():
     else:
         raise ValueError("You must provide the model_name_or_path or config_name")
 
-    dataset = DatasetForPretraining(data_args.train_data)
+    dataset = DatasetForPretraining(
+        data_args.train_data, shuffle=data_args.shuffle_dataset
+    )
 
-    data_collator = collator_class(tokenizer,
-                                   encoder_mlm_probability=data_args.encoder_mlm_probability,
-                                   decoder_mlm_probability=data_args.decoder_mlm_probability,
-                                   max_seq_length=data_args.max_seq_length)
+    data_collator = collator_class(
+        tokenizer,
+        encoder_mlm_probability=data_args.encoder_mlm_probability,
+        decoder_mlm_probability=data_args.decoder_mlm_probability,
+        max_seq_length=data_args.max_seq_length,
+    )
 
     # Initialize our Trainer
     trainer = PreTrainer(
@@ -115,7 +131,7 @@ def main():
         args=training_args,
         train_dataset=dataset,
         data_collator=data_collator,
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
     )
     trainer.add_callback(TrainerCallbackForSaving())
 
