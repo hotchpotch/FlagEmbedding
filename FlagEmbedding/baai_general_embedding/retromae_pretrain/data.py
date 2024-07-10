@@ -11,20 +11,26 @@ from .utils import tensorize_batch
 
 
 class DatasetForPretraining(torch.utils.data.Dataset):
-    def __init__(self, data_dir, shuffle=True):
-        if os.path.isdir(data_dir):
+    def __init__(self, train_data, shuffle=True):
+        if isinstance(train_data, list):
             datasets = []
-            for file in os.listdir(data_dir):
-                print(f"Loading {file}")
-                file = os.path.join(data_dir, file)
-                datasets.append(self.load_dataset(file))
+            for target in train_data:
+                print(f"Loading {target}")
+                datasets.append(self.load_dataset(target))
             self.dataset = concatenate_datasets(datasets)
-        elif os.path.isfile(data_dir):
-            print(f"Loading {data_dir}")
-            self.dataset = self.load_dataset(data_dir)
         else:
-            self.dataset = load_dataset(data_dir, split="train")
-
+            if os.path.isdir(train_data):
+                datasets = []
+                for target in os.listdir(train_data):
+                    print(f"Loading {target}")
+                    target = os.path.join(train_data, target)
+                    datasets.append(self.load_dataset(target))
+                self.dataset = concatenate_datasets(datasets)
+            elif os.path.isfile(train_data):
+                print(f"Loading {train_data}")
+                self.dataset = self.load_dataset(train_data)
+            else:
+                self.dataset = self.load_dataset(train_data)
         if shuffle:
             print("Shuffling dataset...")
             self.dataset = self.dataset.shuffle(seed=42)
@@ -35,7 +41,8 @@ class DatasetForPretraining(torch.utils.data.Dataset):
         elif os.path.isdir(file):
             return Dataset.load_from_disk(file)
         else:
-            raise NotImplementedError(f"Not support this file format:{file}")
+            return load_dataset(file, split="train")
+            # raise NotImplementedError(f"Not support this file format:{file}")
 
     def __getitem__(self, item):
         return self.dataset[item]["text"]
