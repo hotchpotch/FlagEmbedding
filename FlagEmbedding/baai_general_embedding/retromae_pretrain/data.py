@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import random
 from copy import deepcopy
 from dataclasses import dataclass
@@ -21,10 +22,15 @@ class DatasetForPretraining(torch.utils.data.Dataset):
         else:
             if os.path.isdir(train_data):
                 datasets = []
-                for target in os.listdir(train_data):
-                    print(f"Loading {target}")
-                    target = os.path.join(train_data, target)
-                    datasets.append(self.load_dataset(target))
+                if Path.glob(train_data, "*.allow"):
+                    # allow が存在する場合
+                    datasets.append(self.load_dataset(train_data))
+                else:
+                    target_files = os.listdir(train_data)
+                    for target in target_files:
+                        print(f"Loading {target}")
+                        target = os.path.join(train_data, target)
+                        datasets.append(self.load_dataset(target))
                 self.dataset = concatenate_datasets(datasets)
             elif os.path.isfile(train_data):
                 print(f"Loading {train_data}")
