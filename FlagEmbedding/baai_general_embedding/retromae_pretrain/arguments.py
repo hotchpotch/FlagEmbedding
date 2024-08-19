@@ -56,3 +56,11 @@ class ModelArguments:
             "help": "Pretrained config name or path if not the same as model_name"
         },
     )
+    freeze_input_embeddings: bool = field(
+        default=False, metadata={"help": "freeze layers"}
+    )
+    freeze_mlm_decoder: bool = field(
+        default=False, metadata={"help": "freeze layers"}
+    )
+    
+

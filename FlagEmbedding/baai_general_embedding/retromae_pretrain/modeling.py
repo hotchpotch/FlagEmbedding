@@ -11,6 +11,18 @@ from .enhancedDecoder import BertLayerForDecoder
 
 logger = logging.getLogger(__name__)
 
+def _print_trainable_parameters(model):
+    trainable_params = 0
+    all_params = 0
+    for name, param in model.named_parameters():
+        all_params += param.numel()
+        if param.requires_grad:
+            trainable_params += param.numel()
+            print(f"Trainable: {name}")
+    print(
+        f"trainable params: {trainable_params} || all params: {all_params} || trainable%: {100 * trainable_params / all_params:.2f}"
+    )
+
 
 class RetroMAEForPretraining(nn.Module):
     def __init__(
@@ -19,7 +31,10 @@ class RetroMAEForPretraining(nn.Module):
             model_args: ModelArguments,
     ):
         super(RetroMAEForPretraining, self).__init__()
+        self.model_args = model_args
         self.lm = bert
+        self.layer_freeze(self.lm)
+        _print_trainable_parameters(self.lm)
 
         if hasattr(self.lm, 'bert'):
             self.decoder_embeddings = self.lm.bert.embeddings
@@ -33,7 +48,6 @@ class RetroMAEForPretraining(nn.Module):
 
         self.cross_entropy = nn.CrossEntropyLoss()
 
-        self.model_args = model_args
 
     def gradient_checkpointing_enable(self, **kwargs):
         self.lm.gradient_checkpointing_enable(**kwargs)
@@ -91,6 +105,22 @@ class RetroMAEForPretraining(nn.Module):
     def save_pretrained(self, output_dir: str):
         self.lm.save_pretrained(os.path.join(output_dir, "encoder_model"))
         torch.save(self.state_dict(), os.path.join(output_dir, 'pytorch_model.bin'))
+    
+    def layer_freeze(self, model):
+        if self.model_args.freeze_input_embeddings or self.model_args.freeze_mlm_decoder:
+            for param in model.parameters():
+                param.requires_grad = False
+            if self.model_args.freeze_mlm_decoder:
+                print("freeze mlm decoder")
+                model.lm_head.decoder.weight.requires_grad = True
+                if hasattr(model.lm_head.decoder, "bias"):
+                    model.lm_head.decoder.bias.requires_grad = True
+            if self.model_args.freeze_input_embeddings:
+                print("freeze input embeddings")
+                model.get_input_embeddings().weight.requires_grad = True
+                if hasattr(model.get_input_embeddings(), "bias"):
+                    model.get_input_embeddings().bias.requires_grad = True
+
 
     @classmethod
     def from_pretrained(
